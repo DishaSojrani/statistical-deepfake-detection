@@ -33,6 +33,7 @@ This project uses statistical image analysis techniques to detect deepfake image
 📂 Folder Structure
 ---
 data/
+
  └── sample_images/
  
 notebooks/
