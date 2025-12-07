@@ -34,16 +34,22 @@ This project uses statistical image analysis techniques to detect deepfake image
 ---
 data/
  └── sample_images/
+ 
 notebooks/
+
 scripts/
+
 images/
+
 results/
+
 README.md
 
 -------------
 🚀 How to Run
 ---
 pip install -r requirements.txt
+
 python detect_deepfake.py
 
 -------------
