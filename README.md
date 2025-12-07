@@ -72,8 +72,11 @@ Some results are shown in files.
 📎 Dataset
 ---
 You may use sample datasets like:
+
 1.FaceForensics++
+
 2.Deepfake Detection Challenge (DFDC)
+
 3.kaggle
 
 Some sample images are uploded in files.
