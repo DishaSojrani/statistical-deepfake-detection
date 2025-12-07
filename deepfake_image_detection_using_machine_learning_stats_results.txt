@@ -1,0 +1,9 @@
+=== Descriptive Statistics ===
+Real Mean=117.06, Var=4307.98
+Fake Mean=95.47, Var=3668.68
+
+=== Hypothesis Tests ===
+Chi-square: 0.18, p=1.0000
+KS Test: 0.14, p=0.0000
+T-Test: 256.38, p=0.0000
+Mann-Whitney U: 752317913602.50, p=0.0000

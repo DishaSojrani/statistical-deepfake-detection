@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deepfake Image Detection</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #f2f8ff, #ffffff);
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #0047ab;
+      color: white;
+      text-align: center;
+      padding: 1rem;
+      font-size: 1.5rem;
+      letter-spacing: 1px;
+    }
+    main {
+      max-width: 900px;
+      margin: 2rem auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .upload-section {
+      text-align: center;
+      border: 2px dashed #0047ab;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+    }
+    input[type="file"] {
+      margin-top: 1rem;
+    }
+    button {
+      background: #0047ab;
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #003480;
+    }
+    .result {
+      margin-top: 1rem;
+      text-align: center;
+      font-size: 1.1rem;
+    }
+    .image-preview {
+      margin-top: 1rem;
+      max-width: 250px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 2rem;
+    }
+    th, td {
+      padding: 10px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background: #0047ab;
+      color: white;
+    }
+    .clear-btn {
+      background: #d9534f;
+      margin-top: 10px;
+    }
+    .clear-btn:hover {
+      background: #b52b27;
+    }
+  </style>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script> 
+</head>
+<body>
+  <header>🧠 Deepfake Image Detection</header>
+  <main>
+    <section class="upload-section">
+      <h2>Upload Image</h2>
+      <input type="file" id="imageInput" accept="image/*" />
+      <br /><br />
+      <button onclick="uploadImage()">Predict</button>
+      <div id="result" class="result"></div>
+    </section>
+
+    <section>
+      <h2>📜 Prediction History</h2>
+      <button class="clear-btn" onclick="clearHistory()">Clear History</button>
+      <table id="historyTable">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Image</th>
+            <th>Label</th>
+            <th>Confidence (%)</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>📊 Confidence Score Graph</h2>
+      <canvas id="confidenceChart" height="100"></canvas>
+    </section>
+
+    <section>
+  <h2>🥧 Real vs Fake Pie Chart</h2>
+  <canvas id="pieChart" width="300" height="300"></canvas>
+</section>
+  </main>
+
+  <script>
+const API_BASE = "http://localhost:8080";
+let confidenceChart, pieChart;
+
+async function uploadImage() {
+  const fileInput = document.getElementById("imageInput");
+  const resultDiv = document.getElementById("result");
+
+  if (!fileInput.files.length) {
+    alert("Please select an image first!");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("image", fileInput.files[0]);
+
+  resultDiv.innerHTML = "⏳ Uploading and predicting...";
+
+  try {
+    const res = await fetch(`${API_BASE}/api/predict`, {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      resultDiv.innerHTML = `<span style="color:red;">❌ ${data.error}</span>`;
+      return;
+    }
+
+    resultDiv.innerHTML = `
+      <strong>Result:</strong> ${data.predicted_label} 
+      <br/>Confidence: ${data.confidence}% 
+      <br/><img src="${API_BASE + data.image_url}" class="image-preview" />
+    `;
+
+    loadHistory();
+  } catch (err) {
+    console.error(err);
+    resultDiv.innerHTML = `<span style="color:red;">❌ Error occurred!</span>`;
+  }
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch(`${API_BASE}/api/history`);
+    const data = await res.json();
+    const tbody = document.querySelector("#historyTable tbody");
+    tbody.innerHTML = "";
+
+    if (!Array.isArray(data) || data.length === 0) {
+      tbody.innerHTML = "<tr><td colspan='4'>No history found.</td></tr>";
+      if (confidenceChart) confidenceChart.destroy();
+      if (pieChart) pieChart.destroy();
+      return;
+    }
+
+    data.reverse().forEach((item) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>${item.timestamp}</td>
+        <td><img src="${API_BASE + item.image_url}" width="60" /></td>
+        <td>${item.predicted_label}</td>
+        <td>${item.confidence}</td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    updateCharts(data);
+  } catch (err) {
+    console.error("Failed to load history", err);
+  }
+}
+
+async function clearHistory() {
+  if (!confirm("Are you sure you want to delete all history?")) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/delete-history`, { method: "DELETE" });
+    const data = await res.json();
+    alert(data.message);
+    loadHistory();
+  } catch (err) {
+    alert("❌ Failed to clear history!");
+  }
+}
+
+function updateCharts(data) {
+  const labels = data.map(item => item.timestamp);
+  const confidenceScores = data.map(item => item.confidence);
+
+  // --- Confidence Chart ---
+  const ctx1 = document.getElementById('confidenceChart').getContext('2d');
+  if (confidenceChart) confidenceChart.destroy();
+  confidenceChart = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Confidence (%)',
+        data: confidenceScores,
+        backgroundColor: 'rgba(0, 71, 171, 0.2)',
+        borderColor: '#0047ab',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: { beginAtZero: true, max: 100 }
+      }
+    }
+  });
+
+  // --- Pie Chart ---
+  const realCount = data.filter(item => item.predicted_label.toLowerCase() === 'real').length;
+  const fakeCount = data.filter(item => item.predicted_label.toLowerCase() === 'fake').length;
+
+  const ctx2 = document.getElementById('pieChart').getContext('2d');
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(ctx2, {
+    type: 'pie',
+    data: {
+      labels: ['Real', 'Fake'],
+      datasets: [{
+        data: [realCount, fakeCount],
+        backgroundColor: ['#28a745', '#dc3545']
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        datalabels: {
+          color: 'white',
+          formatter: (value, ctx) => {
+            let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+            let percentage = sum ? ((value / sum) * 100).toFixed(1) : 0;
+            return percentage + '%';
+          },
+          font: { weight: 'bold', size: 14 }
+        },
+        legend: { position: 'bottom' }
+      }
+    },
+    plugins: [ChartDataLabels]
+  });
+}
+
+window.onload = loadHistory;
+</script>
+
+</body>
+</html>
